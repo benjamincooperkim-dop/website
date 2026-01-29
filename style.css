@@ -1,0 +1,195 @@
+/* ===== RESET ===== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+/* ===== BASE (system font like colindodgson.com) ===== */
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  background: #000;
+  color: #fff;
+  overflow: hidden;
+  font-size: 13px;        /* similar scale to Colin Dodgson site */
+  line-height: 1.1;       /* slightly airy but compact */
+
+
+
+}
+
+/* Difference blend on all foreground content */
+body * {
+  mix-blend-mode: difference;
+  color: #ffffff;
+}
+
+/* ===== SLIDESHOW ===== */
+
+.fullscreen {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Make slideshow a true fixed background so overlay layering is reliable */
+#slideshow {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+}
+
+/* Slides stay normal – they are the background */
+.slide {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  mix-blend-mode: normal !important;
+}
+
+/* Ensure video/image elements render correctly */
+.slide video,
+video.slide {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ===== NEON OVERLAY (SOLID COLOUR) ===== */
+/* This sits above slideshow but below text */
+#neonOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+  background: rgb(0 0 0); /* JS will animate this */
+  will-change: background;
+}
+
+#neonOverlay.is-on {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* IMPORTANT:
+   Overlay must NOT inherit the global "difference" blend,
+   otherwise it will do weird inversion against the page. */
+#neonOverlay,
+#neonOverlay * {
+  mix-blend-mode: normal !important;
+}
+
+/* ===== TEXT OVERLAY ===== */
+
+.overlay {
+  position: relative;
+  z-index: 10;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  /* padding similar “edge distance” to Colin Dodgson’s site */
+  padding: 1.5rem 1.5rem 2rem;
+  pointer-events: none;
+  display: flex;
+}
+
+.overlay-inner {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;  /* clients top, info bottom */
+  align-items: flex-start;
+
+  max-width: 520px;    /* wider column so long lines don’t wrap */
+  width: 100%;
+
+  font-size: 1rem;     /* = 13px from body */
+  line-height: 1.1;    /* match body, keeps list nice and even */
+}
+
+/* Links clickable + minimal style */
+.overlay a {
+  pointer-events: auto;
+  text-decoration: none;
+}
+
+.overlay a:hover {
+  text-decoration: underline;
+}
+
+/* Optional: explicitly ensure email links are difference-blended
+   (your body * already does this, but this makes intent clear) */
+.overlay a.email-link {
+  mix-blend-mode: difference;
+}
+
+/* ===== CLIENT LIST ===== */
+
+.clients-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Tight vertical rhythm like a CV/press list */
+.clients-list li + li {
+  margin-top: 0.2em;
+}
+
+/* ===== INFO BLOCK ===== */
+
+.info {
+  margin-top: 2rem;
+}
+
+/* Name: same style as other text (no bold) */
+.name {
+  margin: 0 0 0.25rem;
+}
+
+/* Role: keep on one line on larger screens */
+.role {
+  margin: 0 0 0.75rem;
+  white-space: nowrap;
+}
+
+.email {
+  margin: 0 0 0.75rem;
+}
+
+.company {
+  margin: 0 0 0.75rem;
+}
+
+/* ===== RESPONSIVE ===== */
+
+@media (max-width: 768px) {
+  .overlay {
+    padding: 1.25rem 1.25rem 1.75rem;
+  }
+
+  .overlay-inner {
+    max-width: 100%;
+    font-size: 0.92rem;   /* slightly smaller on mobile */
+  }
+
+  /* On small screens allow the role line to wrap so it doesn’t overflow */
+  .role {
+    white-space: normal;
+  }
+}
