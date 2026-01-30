@@ -3,34 +3,62 @@
 <head>
   <meta charset="utf-8" />
   <title>Benjamin Cooper Kim — Art Director, Director, Cinematographer</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="description" content="Benjamin Cooper Kim is a multi-disciplinary creative working as an art director, director and cinematographer across fashion, culture and the arts.">
 
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; height: 100%; }
 
+    /* IMPORTANT:
+       Make the browser chrome / safe area blend with your page.
+       If you prefer black, set both to #000 instead. */
+    html, body { background: #000; }
+
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #fff;
       color: #000;
       overflow: hidden;
       font-size: 14px;
       line-height: 1.35;
+
+      /* Prevent iOS bounce from revealing white */
+      overscroll-behavior: none;
     }
 
-    /* ✅ Use fixed + dynamic viewport height to avoid top gaps on mobile */
+    /* A reliable "true fullscreen" wrapper */
     #slideshow {
       position: fixed;
-      inset: 0;
-      width: 100%;
+      left: 0;
+      right: 0;
+
+      /* Fill safe-area from the very top */
+      top: 0;
+      bottom: 0;
+
+      /* Modern iOS: use svh (small viewport height) so it always covers
+         even when address bar is visible */
+      height: 100svh;
+
+      /* Fallbacks */
+      height: 100dvh;
       height: 100vh;
-      height: 100dvh; /* modern mobile viewport */
+
       z-index: 0;
       overflow: hidden;
-      background: #fff;
+
+      /* Match your chosen page background to hide any gap */
+      background: #000;
     }
 
+    /* If you want to respect safe-area insets explicitly, keep these:
+       (they're safe even if insets are 0) */
+    #slideshow {
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* Video covers the whole container including safe area padding */
     #slideshow video {
       position: absolute;
       inset: 0;
@@ -38,7 +66,7 @@
       height: 100%;
       object-fit: cover;
       mix-blend-mode: normal;
-      background: #fff;
+      background: #000;
     }
 
     .overlay {
@@ -80,13 +108,8 @@
       poster="media/poster_master.jpg"
       loop
     >
-      <!-- ✅ BEST: portrait art-directed mobile export (add this file if you make it) -->
       <source src="media/master_portrait_1080p.mp4" type="video/mp4" media="(max-width: 900px) and (orientation: portrait)">
-
-      <!-- ✅ Mobile landscape fallback -->
       <source src="media/master_1080p.mp4" type="video/mp4" media="(max-width: 900px)">
-
-      <!-- ✅ Desktop -->
       <source src="media/master_1440p.mp4" type="video/mp4">
     </video>
   </div>
@@ -105,6 +128,7 @@ For all moving image post production services,
 please contact <a href="mailto:studio@luminescent-films.com">studio@luminescent-films.com</a>
 or visit <a href="https://www.luminescent-films.com" target="_blank" rel="noopener noreferrer">www.luminescent-films.com</a>
 
+
 Selected Clients:
 Alexander McQueen
 Aries
@@ -113,6 +137,7 @@ Comme Des Garçons
 Cos
 Dior
 Loewe
+Marc Jacobs
 Moncler
 Oakley
 Palace Skateboards
