@@ -2,53 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-
-  <!-- ✅ Title: important for SEO -->
-  <title>Benjamin Cooper Kim — Art Director, Director & Cinematographer</title>
-
+  <title>Benjamin Cooper Kim — Art Director, Director, Cinematographer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <!-- ✅ Meta description: the "subtitle" shown in search results -->
-  <meta name="description" content="Australian born Korean and based in London, Benjamin Cooper Kim is a multidisciplinary creative who works as an art director, director and cinematographer across the fields of fashion, culture and the arts." />
-
-  <!-- ✅ Social sharing previews (optional but recommended) -->
-  <meta property="og:title" content="Benjamin Cooper Kim — Art Director, Director & Cinematographer" />
-  <meta property="og:description" content="Australian born Korean and based in London, Benjamin Cooper Kim is a multidisciplinary creative who works as an art director, director and cinematographer across the fields of fashion, culture and the arts." />
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://www.benjamincooperkim.com" />
-  <!-- Put a real preview image here (must be absolute URL when live) -->
-  <meta property="og:image" content="https://www.benjamincooperkim.com/media/Benjamin_Cooper_Kim_Alexander_McQueen_01.jpg" />
-
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Benjamin Cooper Kim — Art Director, Director & Cinematographer" />
-  <meta name="twitter:description" content="Australian born Korean and based in London, Benjamin Cooper Kim is a multidisciplinary creative who works as an art director, director and cinematographer across the fields of fashion, culture and the arts." />
-  <meta name="twitter:image" content="https://www.benjamincooperkim.com/media/Benjamin_Cooper_Kim_Alexander_McQueen_01.jpg" />
-
-  <!-- ✅ Structured data (Person) -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "Person",
-    "name": "Benjamin Cooper Kim",
-    "jobTitle": ["Art Director", "Director", "Cinematographer", "Director of Photography",],
-    "url": "https://www.benjamincooperkim.com",
-    "image": "https://www.benjamincooperkim.com/media/Benjamin_Cooper_Kim_Alexander_McQueen_01.jpg",
-    "homeLocation": {
-      "@type": "Place",
-      "name": "London, United Kingdom"
-    },
-    "sameAs": [
-      "https://www.luminescent-films.com"
-    ]
-  }
-  </script>
+  <meta name="description" content="Benjamin Cooper Kim is a multi-disciplinary creative working as an art director, director and cinematographer across fashion, culture and the arts.">
 
   <style>
     *,
     *::before,
-    *::after {
-      box-sizing: border-box;
-    }
+    *::after { box-sizing: border-box; }
 
     html, body {
       margin: 0;
@@ -56,40 +17,39 @@
       height: 100%;
     }
 
+    /* ✅ White fallback background (prevents any black flashes) */
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #000;
-      color: #fff;
+      background: #fff;
+      color: #000;
       overflow: hidden;
-
       font-size: 14px;
       line-height: 1.35;
     }
 
-    /* Difference blend effect */
-    body * {
-      mix-blend-mode: difference;
-      color: #fff;
-    }
-
-    /* Slideshow background */
+    /* ✅ Slideshow background container */
     #slideshow {
       position: absolute;
       inset: 0;
       z-index: 0;
       overflow: hidden;
+      background: #fff;
     }
 
-    .slide {
+    /* ✅ IMPORTANT: video is NORMAL blend mode (never inverted) */
+    #slideshow video {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
-      mix-blend-mode: normal !important;
+
+      /* lock video rendering */
+      mix-blend-mode: normal;
+      background: #fff;
     }
 
-    /* Text overlay */
+    /* Overlay container */
     .overlay {
       position: relative;
       z-index: 10;
@@ -101,34 +61,49 @@
       max-width: 520px;
     }
 
-    /* Paragraph with all text */
+    /* ✅ Apply difference blend ONLY to overlay text, not the whole page */
+    .overlay,
+    .overlay * {
+      mix-blend-mode: difference;
+      color: #fff;
+    }
+
     .copy {
       margin: 0;
       white-space: pre-line;
     }
 
-    /* Links: clickable, no underline */
     a {
       pointer-events: auto;
       text-decoration: none;
       color: inherit;
     }
 
-    /* ✅ Visually hidden text (SEO + accessibility) */
-    .visually-hidden {
-      position: absolute;
-      left: -9999px;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
+    /* Optional: slightly bigger tap targets on mobile */
+    @media (max-width: 600px) {
+      .overlay { padding: 20px 0 0 20px; }
     }
   </style>
 </head>
 
 <body>
 
-  <!-- Background slideshow -->
-  <div id="slideshow"></div>
+  <!-- Background master video -->
+  <div id="slideshow">
+    <video
+      id="masterVideo"
+      autoplay
+      muted
+      playsinline
+      preload="auto"
+      poster="media/poster_master.jpg"
+    >
+      <!-- ✅ optional mobile/smaller screens source -->
+      <source src="media/master_1080p.mp4" type="video/mp4" media="(max-width: 900px)">
+      <!-- ✅ main source -->
+      <source src="media/master_1440p.mp4" type="video/mp4">
+    </video>
+  </div>
 
   <!-- Text overlay -->
   <div class="overlay">
@@ -136,15 +111,12 @@
       <p class="copy">
 Benjamin Cooper Kim
 Art Director, Director, Cinematographer
-<span class="visually-hidden">London-based art director, director and DOP working across fashion, culture and the arts.</span>
 
 <a href="mailto:benjamincooperkim@gmail.com">benjamincooperkim@gmail.com</a>
-
 
 For all moving image post production services,
 please contact <a href="mailto:studio@luminescent-films.com">studio@luminescent-films.com</a>
 or visit <a href="https://www.luminescent-films.com" target="_blank" rel="noopener noreferrer">www.luminescent-films.com</a>
-
 
 Selected Clients:
 Alexander McQueen
@@ -171,7 +143,6 @@ Vogue Paris
     </div>
   </div>
 
-  <!-- Your slideshow logic -->
   <script src="script.js"></script>
 </body>
 </html>
