@@ -1,71 +1,45 @@
 const video = document.getElementById("masterVideo");
+const stage = document.getElementById("slideshow");
+
+// State
+let holdPaused = false;     // user is holding (mouse/touch)
+let linkPaused = false;     // hovering/focusing a link
+let wasPlayingBeforeHold = true;
 
 // ------------------------------
-// Basic helpers
+// Playback helpers
 // ------------------------------
 function safePlay() {
   video.play().catch(() => {});
 }
+
 function safePause() {
-  video.pause();
+  try { video.pause(); } catch (_) {}
 }
 
-function wrapTime(t) {
-  const d = video.duration;
-  if (!isFinite(d) || d <= 0) return 0;
-  return ((t % d) + d) % d;
-}
+// Decide whether we should be playing right now
+function syncPlayback() {
+  const shouldPause = holdPaused || linkPaused;
 
-function seekNow(t) {
-  if (!isFinite(video.duration) || video.duration <= 0) return;
-  const wrapped = wrapTime(t);
-
-  try {
-    if (typeof video.fastSeek === "function") video.fastSeek(wrapped);
-    else video.currentTime = wrapped;
-  } catch (_) {}
+  if (shouldPause) {
+    safePause();
+  } else {
+    safePlay();
+  }
 }
 
 // ------------------------------
-// Hover pause on overlay links
-// ------------------------------
-let isDragging = false;
-
-function bindHoverPause(selector = ".overlay a") {
-  document.querySelectorAll(selector).forEach(link => {
-    link.addEventListener("mouseenter", () => {
-      stopInertia();
-      safePause();
-    });
-    link.addEventListener("mouseleave", () => {
-      if (!isDragging) safePlay();
-    });
-    link.addEventListener("focus", () => {
-      stopInertia();
-      safePause();
-    });
-    link.addEventListener("blur", () => {
-      if (!isDragging) safePlay();
-    });
-  });
-}
-
-// ------------------------------
-// Force loop (belt + braces)
+// Force loop + watchdog (mobile stability)
 // ------------------------------
 function forceLoopAndPlay() {
-  seekNow(0);
+  try { video.currentTime = 0; } catch (_) {}
   safePlay();
 }
 
-video.addEventListener("ended", () => {
-  // Some mobile browsers get weird with loop; force it.
-  forceLoopAndPlay();
-});
+// Belt + braces: if loop attribute fails, force it.
+video.addEventListener("ended", forceLoopAndPlay);
 
-// ------------------------------
-// Stall watchdog (fix "stops after a few loops" on mobile)
-// ------------------------------
+// Watchdog: if it stalls while "should be playing", nudge it.
 let watchdogTimer = null;
 let lastT = 0;
 
@@ -74,20 +48,19 @@ function startWatchdog() {
   lastT = video.currentTime || 0;
 
   watchdogTimer = setInterval(() => {
-    // If user is scrubbing or page hidden, don't interfere
-    if (isDragging || document.visibilityState !== "visible") return;
+    if (document.visibilityState !== "visible") return;
+    if (holdPaused || linkPaused) return;
 
-    // If video should be playing but time isn't moving, nudge it
-    const shouldBePlaying = !video.paused;
+    // If supposed to be playing but time isn't moving -> nudge play
     const t = video.currentTime || 0;
+    const shouldBePlaying = !video.paused;
 
     if (shouldBePlaying) {
-      const stuck = Math.abs(t - lastT) < 0.01; // ~no movement
+      const stuck = Math.abs(t - lastT) < 0.01;
       if (stuck) {
-        // Try a gentle nudge: play again
         safePlay();
 
-        // If we're at the very end, force loop
+        // If it's stuck near the end, force loop
         if (isFinite(video.duration) && video.duration > 0 && t >= video.duration - 0.05) {
           forceLoopAndPlay();
         }
@@ -104,195 +77,98 @@ function stopWatchdog() {
 }
 
 // ------------------------------
-// Scrub + inertia (wrap-around)
+// Pause on hover/focus links (like before)
 // ------------------------------
-const SCRUB_SECONDS_PER_PX = 0.02;
-const VEL_SMOOTHING = 0.25;
+function bindLinkPause(selector = ".overlay a") {
+  document.querySelectorAll(selector).forEach(link => {
+    link.addEventListener("mouseenter", () => {
+      linkPaused = true;
+      syncPlayback();
+    });
+    link.addEventListener("mouseleave", () => {
+      linkPaused = false;
+      syncPlayback();
+    });
 
-const INERTIA_FRICTION = 4.5;
-const INERTIA_STOP_VEL = 0.1;
-
-let startX = 0;
-let startY = 0;
-let startTime = 0;
-
-let lastMoveTime = 0;
-let lastDeltaPx = 0;
-let velPxPerS = 0;
-
-let inertiaRaf = null;
-let inertiaVelSecPerS = 0;
-
-// RAF throttled seek
-let seekRaf = null;
-let desiredTime = null;
-
-function requestSeek(t) {
-  desiredTime = t;
-  if (seekRaf) return;
-
-  seekRaf = requestAnimationFrame(() => {
-    seekRaf = null;
-    if (desiredTime == null) return;
-    seekNow(desiredTime);
-    desiredTime = null;
+    link.addEventListener("focus", () => {
+      linkPaused = true;
+      syncPlayback();
+    });
+    link.addEventListener("blur", () => {
+      linkPaused = false;
+      syncPlayback();
+    });
   });
 }
 
-function stopInertia() {
-  if (inertiaRaf) cancelAnimationFrame(inertiaRaf);
-  inertiaRaf = null;
-  inertiaVelSecPerS = 0;
-}
-
-function bindScrubPointer() {
-  const stage = document.getElementById("slideshow");
+// ------------------------------
+// Hold-to-pause anywhere (mouse + touch via Pointer Events)
+// ------------------------------
+function bindHoldToPause() {
+  // Make sure iOS doesn’t treat this as scroll/zoom gesture on the stage
   stage.style.touchAction = "none";
 
   stage.addEventListener("pointerdown", (e) => {
-    if (!e.isPrimary) return;
+    // Don't interfere with clicking links
     if (e.target.closest("a, button, input, textarea, select, label")) return;
 
-    stopInertia();
-    isDragging = true;
+    wasPlayingBeforeHold = !video.paused;
+    holdPaused = true;
+    syncPlayback();
 
-    startX = e.clientX;
-    startY = e.clientY;
-    startTime = video.currentTime || 0;
-
-    lastMoveTime = performance.now();
-    lastDeltaPx = 0;
-    velPxPerS = 0;
-
-    safePause();
-
-    stage.setPointerCapture(e.pointerId);
+    // Capture pointer so we reliably get pointerup even if finger moves
+    try { stage.setPointerCapture(e.pointerId); } catch (_) {}
     e.preventDefault();
   }, { passive: false });
 
-  window.addEventListener("pointermove", (e) => {
-    if (!isDragging) return;
+  const release = (e) => {
+    if (!holdPaused) return;
 
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-    const deltaPx = dx + dy;
+    holdPaused = false;
+    // Only resume if it was playing before hold, and no link hover pause
+    if (wasPlayingBeforeHold && !linkPaused) safePlay();
+    else syncPlayback();
 
-    const targetTime = startTime + deltaPx * SCRUB_SECONDS_PER_PX;
-    requestSeek(targetTime);
+    try { stage.releasePointerCapture(e.pointerId); } catch (_) {}
+  };
 
-    const now = performance.now();
-    const dtMs = Math.max(1, now - lastMoveTime);
-    const dPx = deltaPx - lastDeltaPx;
+  stage.addEventListener("pointerup", release);
+  stage.addEventListener("pointercancel", release);
 
-    const instVel = (dPx / dtMs) * 1000;
-    velPxPerS = velPxPerS + (instVel - velPxPerS) * VEL_SMOOTHING;
-
-    lastMoveTime = now;
-    lastDeltaPx = deltaPx;
-
-    e.preventDefault();
-  }, { passive: false });
-
-  window.addEventListener("pointerup", () => endDrag());
-  window.addEventListener("pointercancel", () => endDrag());
-
-  function endDrag() {
-    if (!isDragging) return;
-    isDragging = false;
-
-    inertiaVelSecPerS = velPxPerS * SCRUB_SECONDS_PER_PX;
-
-    // flush any queued seek
-    if (desiredTime != null) seekNow(desiredTime);
-    desiredTime = null;
-
-    if (Math.abs(inertiaVelSecPerS) > INERTIA_STOP_VEL) startInertia();
-    else safePlay();
-  }
-
-  function startInertia() {
-    let prev = performance.now();
-
-    const step = (t) => {
-      inertiaRaf = null;
-
-      const dt = Math.max(0.001, (t - prev) / 1000);
-      prev = t;
-
-      requestSeek((video.currentTime || 0) + inertiaVelSecPerS * dt);
-
-      const sign = Math.sign(inertiaVelSecPerS);
-      const mag = Math.max(0, Math.abs(inertiaVelSecPerS) * (1 - INERTIA_FRICTION * dt));
-      inertiaVelSecPerS = mag * sign;
-
-      if (Math.abs(inertiaVelSecPerS) < INERTIA_STOP_VEL) {
-        stopInertia();
-        safePlay();
-        return;
-      }
-
-      inertiaRaf = requestAnimationFrame(step);
-    };
-
-    inertiaRaf = requestAnimationFrame(step);
-  }
+  // Safety: if the pointer ends outside the stage
+  window.addEventListener("pointerup", release);
+  window.addEventListener("pointercancel", release);
 }
 
 // ------------------------------
-// Visibility continuity (resume on return)
+// Visibility: resume cleanly when returning
 // ------------------------------
-let hiddenAt = null;
-let wasPlayingBeforeHide = false;
-
-function bindVisibilityContinuity() {
-  const onHide = () => {
-    hiddenAt = performance.now();
-    wasPlayingBeforeHide = !video.paused && !video.ended;
-  };
-
-  const onShow = () => {
-    if (hiddenAt == null) return;
-
-    const elapsedSec = (performance.now() - hiddenAt) / 1000;
-    hiddenAt = null;
-
-    if (isFinite(video.duration) && video.duration > 0) {
-      seekNow((video.currentTime || 0) + elapsedSec);
-    }
-
-    if (!isDragging && wasPlayingBeforeHide) safePlay();
-  };
-
+function bindVisibilityHandling() {
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") onHide();
-    if (document.visibilityState === "visible") onShow();
+    if (document.visibilityState === "visible") {
+      // Resume if we aren't intentionally paused
+      syncPlayback();
+    } else {
+      // Pause in background (saves battery & avoids weird states)
+      safePause();
+    }
   });
-
-  window.addEventListener("pagehide", onHide);
-  window.addEventListener("pageshow", onShow);
-  window.addEventListener("blur", onHide);
-  window.addEventListener("focus", onShow);
 }
 
 // ------------------------------
 // Init
 // ------------------------------
 window.addEventListener("load", () => {
-  bindHoverPause();
-  bindScrubPointer();
-  bindVisibilityContinuity();
+  bindLinkPause();
+  bindHoldToPause();
+  bindVisibilityHandling();
 
+  // Start ASAP once a frame is available; poster covers before then
   video.addEventListener("loadeddata", () => {
-    safePlay();
+    syncPlayback();
     startWatchdog();
   }, { once: true });
 
-  // restart watchdog if the browser pauses unexpectedly
-  video.addEventListener("play", () => startWatchdog());
-  video.addEventListener("pause", () => {
-    if (document.visibilityState === "visible" && !isDragging) startWatchdog();
-  });
-
-  // if autoplay is blocked, first interaction starts it
+  // If autoplay is blocked, first interaction starts it.
   window.addEventListener("pointerdown", () => safePlay(), { once: true });
 });
