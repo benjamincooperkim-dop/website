@@ -7,17 +7,10 @@
   <meta name="description" content="Benjamin Cooper Kim is a multi-disciplinary creative working as an art director, director and cinematographer across fashion, culture and the arts.">
 
   <style>
-    *,
-    *::before,
-    *::after { box-sizing: border-box; }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; }
 
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-    }
-
-    /* ✅ White fallback background (prevents any black flashes) */
+    /* White fallback so you never see black */
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: #fff;
@@ -27,7 +20,6 @@
       line-height: 1.35;
     }
 
-    /* ✅ Slideshow background container */
     #slideshow {
       position: absolute;
       inset: 0;
@@ -36,20 +28,17 @@
       background: #fff;
     }
 
-    /* ✅ IMPORTANT: video is NORMAL blend mode (never inverted) */
+    /* Video must remain normal blend mode */
     #slideshow video {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
-
-      /* lock video rendering */
       mix-blend-mode: normal;
       background: #fff;
     }
 
-    /* Overlay container */
     .overlay {
       position: relative;
       z-index: 10;
@@ -57,21 +46,15 @@
       pointer-events: none;
     }
 
-    .overlay-inner {
-      max-width: 520px;
-    }
+    .overlay-inner { max-width: 520px; }
 
-    /* ✅ Apply difference blend ONLY to overlay text, not the whole page */
-    .overlay,
-    .overlay * {
+    /* Apply difference blend ONLY to overlay text */
+    .overlay, .overlay * {
       mix-blend-mode: difference;
       color: #fff;
     }
 
-    .copy {
-      margin: 0;
-      white-space: pre-line;
-    }
+    .copy { margin: 0; white-space: pre-line; }
 
     a {
       pointer-events: auto;
@@ -79,7 +62,6 @@
       color: inherit;
     }
 
-    /* Optional: slightly bigger tap targets on mobile */
     @media (max-width: 600px) {
       .overlay { padding: 20px 0 0 20px; }
     }
@@ -87,8 +69,6 @@
 </head>
 
 <body>
-
-  <!-- Background master video -->
   <div id="slideshow">
     <video
       id="masterVideo"
@@ -97,33 +77,35 @@
       playsinline
       preload="auto"
       poster="media/poster_master.jpg"
+      loop
     >
-      <!-- ✅ optional mobile/smaller screens source -->
+      <!-- Optional: smaller version for mobile -->
       <source src="media/master_1080p.mp4" type="video/mp4" media="(max-width: 900px)">
-      <!-- ✅ main source -->
       <source src="media/master_1440p.mp4" type="video/mp4">
     </video>
   </div>
 
-  <!-- Text overlay -->
   <div class="overlay">
     <div class="overlay-inner">
       <p class="copy">
 Benjamin Cooper Kim
 Art Director, Director, Cinematographer
 
+
 <a href="mailto:benjamincooperkim@gmail.com">benjamincooperkim@gmail.com</a>
+
 
 For all moving image post production services,
 please contact <a href="mailto:studio@luminescent-films.com">studio@luminescent-films.com</a>
 or visit <a href="https://www.luminescent-films.com" target="_blank" rel="noopener noreferrer">www.luminescent-films.com</a>
+
 
 Selected Clients:
 Alexander McQueen
 Aries
 Burberry
 Comme Des Garçons
-Cos
+COS
 Dior
 Loewe
 Marc Jacobs
