@@ -10,24 +10,19 @@ function safePause() {
   video.pause();
 }
 
-// Wrap time into [0, duration)
 function wrapTime(t) {
   const d = video.duration;
   if (!isFinite(d) || d <= 0) return 0;
   return ((t % d) + d) % d;
 }
 
-// Use fastSeek if available (Safari/Chrome sometimes better)
 function seekNow(t) {
   if (!isFinite(video.duration) || video.duration <= 0) return;
   const wrapped = wrapTime(t);
 
   try {
-    if (typeof video.fastSeek === "function") {
-      video.fastSeek(wrapped);
-    } else {
-      video.currentTime = wrapped;
-    }
+    if (typeof video.fastSeek === "function") video.fastSeek(wrapped);
+    else video.currentTime = wrapped;
   } catch (_) {}
 }
 
@@ -45,7 +40,6 @@ function bindHoverPause(selector = ".overlay a") {
     link.addEventListener("mouseleave", () => {
       if (!isDragging) safePlay();
     });
-
     link.addEventListener("focus", () => {
       stopInertia();
       safePause();
@@ -57,17 +51,62 @@ function bindHoverPause(selector = ".overlay a") {
 }
 
 // ------------------------------
-// Infinite autoplay loop fallback
+// Force loop (belt + braces)
 // ------------------------------
-video.addEventListener("ended", () => {
+function forceLoopAndPlay() {
   seekNow(0);
   safePlay();
+}
+
+video.addEventListener("ended", () => {
+  // Some mobile browsers get weird with loop; force it.
+  forceLoopAndPlay();
 });
 
 // ------------------------------
-// Scrub + inertia (RAFed seek to prevent freezing)
+// Stall watchdog (fix "stops after a few loops" on mobile)
 // ------------------------------
-const SCRUB_SECONDS_PER_PX = 0.02; // tweak feel
+let watchdogTimer = null;
+let lastT = 0;
+
+function startWatchdog() {
+  stopWatchdog();
+  lastT = video.currentTime || 0;
+
+  watchdogTimer = setInterval(() => {
+    // If user is scrubbing or page hidden, don't interfere
+    if (isDragging || document.visibilityState !== "visible") return;
+
+    // If video should be playing but time isn't moving, nudge it
+    const shouldBePlaying = !video.paused;
+    const t = video.currentTime || 0;
+
+    if (shouldBePlaying) {
+      const stuck = Math.abs(t - lastT) < 0.01; // ~no movement
+      if (stuck) {
+        // Try a gentle nudge: play again
+        safePlay();
+
+        // If we're at the very end, force loop
+        if (isFinite(video.duration) && video.duration > 0 && t >= video.duration - 0.05) {
+          forceLoopAndPlay();
+        }
+      }
+    }
+
+    lastT = t;
+  }, 1200);
+}
+
+function stopWatchdog() {
+  if (watchdogTimer) clearInterval(watchdogTimer);
+  watchdogTimer = null;
+}
+
+// ------------------------------
+// Scrub + inertia (wrap-around)
+// ------------------------------
+const SCRUB_SECONDS_PER_PX = 0.02;
 const VEL_SMOOTHING = 0.25;
 
 const INERTIA_FRICTION = 4.5;
@@ -84,7 +123,7 @@ let velPxPerS = 0;
 let inertiaRaf = null;
 let inertiaVelSecPerS = 0;
 
-// RAF seek throttle (prevents decode stalls)
+// RAF throttled seek
 let seekRaf = null;
 let desiredTime = null;
 
@@ -113,12 +152,6 @@ function bindScrubPointer() {
   stage.addEventListener("pointerdown", (e) => {
     if (!e.isPrimary) return;
     if (e.target.closest("a, button, input, textarea, select, label")) return;
-
-    // Ensure metadata is loading so duration exists ASAP
-    if (!isFinite(video.duration) || video.duration <= 0) {
-      // poster is already showing; trigger load/play attempt
-      safePlay();
-    }
 
     stopInertia();
     isDragging = true;
@@ -151,7 +184,7 @@ function bindScrubPointer() {
     const dtMs = Math.max(1, now - lastMoveTime);
     const dPx = deltaPx - lastDeltaPx;
 
-    const instVel = (dPx / dtMs) * 1000; // px/s
+    const instVel = (dPx / dtMs) * 1000;
     velPxPerS = velPxPerS + (instVel - velPxPerS) * VEL_SMOOTHING;
 
     lastMoveTime = now;
@@ -169,15 +202,12 @@ function bindScrubPointer() {
 
     inertiaVelSecPerS = velPxPerS * SCRUB_SECONDS_PER_PX;
 
-    // If a seek is queued, flush it before inertia/play
+    // flush any queued seek
     if (desiredTime != null) seekNow(desiredTime);
     desiredTime = null;
 
-    if (Math.abs(inertiaVelSecPerS) > INERTIA_STOP_VEL) {
-      startInertia();
-    } else {
-      safePlay();
-    }
+    if (Math.abs(inertiaVelSecPerS) > INERTIA_STOP_VEL) startInertia();
+    else safePlay();
   }
 
   function startInertia() {
@@ -209,10 +239,8 @@ function bindScrubPointer() {
 }
 
 // ------------------------------
-// Tab switching: "continuous" playback illusion
+// Visibility continuity (resume on return)
 // ------------------------------
-// We cannot force all browsers to keep decoding video in background,
-// but we can jump forward by elapsed time when returning.
 let hiddenAt = null;
 let wasPlayingBeforeHide = false;
 
@@ -229,11 +257,9 @@ function bindVisibilityContinuity() {
     hiddenAt = null;
 
     if (isFinite(video.duration) && video.duration > 0) {
-      // Move playhead forward as if it had continued playing
       seekNow((video.currentTime || 0) + elapsedSec);
     }
 
-    // If user expects autoplay, resume
     if (!isDragging && wasPlayingBeforeHide) safePlay();
   };
 
@@ -242,7 +268,6 @@ function bindVisibilityContinuity() {
     if (document.visibilityState === "visible") onShow();
   });
 
-  // Extra belt-and-braces for Safari
   window.addEventListener("pagehide", onHide);
   window.addEventListener("pageshow", onShow);
   window.addEventListener("blur", onHide);
@@ -257,11 +282,17 @@ window.addEventListener("load", () => {
   bindScrubPointer();
   bindVisibilityContinuity();
 
-  // Start once a frame is available (poster shows until then)
   video.addEventListener("loadeddata", () => {
     safePlay();
+    startWatchdog();
   }, { once: true });
 
-  // If autoplay is blocked for any reason, first interaction will start it
+  // restart watchdog if the browser pauses unexpectedly
+  video.addEventListener("play", () => startWatchdog());
+  video.addEventListener("pause", () => {
+    if (document.visibilityState === "visible" && !isDragging) startWatchdog();
+  });
+
+  // if autoplay is blocked, first interaction starts it
   window.addEventListener("pointerdown", () => safePlay(), { once: true });
 });

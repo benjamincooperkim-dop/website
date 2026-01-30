@@ -10,7 +10,6 @@
     *, *::before, *::after { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; height: 100%; }
 
-    /* White fallback so you never see black */
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: #fff;
@@ -20,15 +19,18 @@
       line-height: 1.35;
     }
 
+    /* ✅ Use fixed + dynamic viewport height to avoid top gaps on mobile */
     #slideshow {
-      position: absolute;
+      position: fixed;
       inset: 0;
+      width: 100%;
+      height: 100vh;
+      height: 100dvh; /* modern mobile viewport */
       z-index: 0;
       overflow: hidden;
       background: #fff;
     }
 
-    /* Video must remain normal blend mode */
     #slideshow video {
       position: absolute;
       inset: 0;
@@ -48,7 +50,6 @@
 
     .overlay-inner { max-width: 520px; }
 
-    /* Apply difference blend ONLY to overlay text */
     .overlay, .overlay * {
       mix-blend-mode: difference;
       color: #fff;
@@ -79,8 +80,13 @@
       poster="media/poster_master.jpg"
       loop
     >
-      <!-- Optional: smaller version for mobile -->
+      <!-- ✅ BEST: portrait art-directed mobile export (add this file if you make it) -->
+      <source src="media/master_portrait_1080p.mp4" type="video/mp4" media="(max-width: 900px) and (orientation: portrait)">
+
+      <!-- ✅ Mobile landscape fallback -->
       <source src="media/master_1080p.mp4" type="video/mp4" media="(max-width: 900px)">
+
+      <!-- ✅ Desktop -->
       <source src="media/master_1440p.mp4" type="video/mp4">
     </video>
   </div>
@@ -99,16 +105,14 @@ For all moving image post production services,
 please contact <a href="mailto:studio@luminescent-films.com">studio@luminescent-films.com</a>
 or visit <a href="https://www.luminescent-films.com" target="_blank" rel="noopener noreferrer">www.luminescent-films.com</a>
 
-
 Selected Clients:
 Alexander McQueen
 Aries
 Burberry
 Comme Des Garçons
-COS
+Cos
 Dior
 Loewe
-Marc Jacobs
 Moncler
 Oakley
 Palace Skateboards
