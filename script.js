@@ -10,6 +10,7 @@ let wasPlayingBeforeHold = true;
 // Playback helpers
 // ------------------------------
 function safePlay() {
+  // If the browser blocks autoplay, this will reject; we ignore and rely on user interaction.
   video.play().catch(() => {});
 }
 
@@ -20,83 +21,81 @@ function safePause() {
 // Decide whether we should be playing right now
 function syncPlayback() {
   const shouldPause = holdPaused || linkPaused;
-
-  if (shouldPause) {
-    safePause();
-  } else {
-    safePlay();
-  }
+  if (shouldPause) safePause();
+  else safePlay();
 }
 
 // ------------------------------
-// Manual loop + recovery (mobile stability)
+// Loop + recovery (mobile stability)
 // ------------------------------
+
+// Manual loop guard: some browsers (notably iOS Safari) can occasionally stall at loop boundaries.
 function softLoop() {
-  // Some browsers can stall exactly at duration; rewinding to 0 is more reliable than trusting native loop.
+  if (holdPaused || linkPaused) return;
   try { video.currentTime = 0; } catch (_) {}
   safePlay();
 }
 
-// Belt + braces: if loop attribute fails, force it.
 video.addEventListener("ended", softLoop);
 
-// Catch "near end" cases where 'ended' doesn't fire (seen on iOS occasionally)
+// Catch "near end" cases where ended doesn't fire.
 video.addEventListener("timeupdate", () => {
   if (holdPaused || linkPaused) return;
   if (!isFinite(video.duration) || video.duration <= 0) return;
-  if (video.currentTime >= video.duration - 0.05) softLoop();
+
+  // If we get extremely close to the end, force the loop.
+  if (video.currentTime >= video.duration - 0.05) {
+    softLoop();
+  }
 });
 
-function recoverVideo() {
-  // Don't fight intentional pauses
+// Recovery is throttled so we don't accidentally create a black-screen loop by over-resetting.
+let lastRecoverAt = 0;
+function recoverVideo(reason = "") {
   if (holdPaused || linkPaused) return;
 
-  // Step 1: quick decode nudge (seek back a hair + play)
+  const now = Date.now();
+  if (now - lastRecoverAt < 2500) return; // throttle
+  lastRecoverAt = now;
+
+  // Only attempt recovery once we have something loaded.
+  // readyState >= 2 means we have current frame data.
+  if (video.readyState < 2) {
+    // Try play anyway; once data arrives it should start.
+    safePlay();
+    return;
+  }
+
+  // 1) Gentle nudge: pause -> small seek back -> play
   try { video.pause(); } catch (_) {}
 
   try {
-    const t = Math.max(0, (video.currentTime || 0) - 0.05);
+    const t = Math.max(0, (video.currentTime || 0) - 0.08);
     video.currentTime = t;
   } catch (_) {}
 
   safePlay();
 
-  // Step 2 (escalation): if still stuck, reload element (strong Safari reset)
-  setTimeout(() => {
-    if (holdPaused || linkPaused) return;
-    if (video.paused) return;
-
-    const t1 = video.currentTime || 0;
-    setTimeout(() => {
-      const t2 = video.currentTime || 0;
-      const stuck = Math.abs(t2 - t1) < 0.01;
-
-      if (stuck) {
-        try {
-          video.pause();
-          // Keep currentTime reset tiny to avoid re-seeking to a bad timestamp.
-          video.currentTime = 0;
-          video.load();
-        } catch (_) {}
-
-        safePlay();
-      }
-    }, 450);
-  }, 250);
+  // 2) If we're stuck at (or beyond) the end, loop.
+  if (isFinite(video.duration) && video.duration > 0) {
+    if ((video.currentTime || 0) >= video.duration - 0.05) softLoop();
+  }
 }
 
-// Trigger recovery on common stall/error events
+// Trigger recovery on common stall/error events (these fire a lot on mobile networks).
 ["stalled", "waiting", "error"].forEach(evt => {
-  video.addEventListener(evt, () => recoverVideo());
+  video.addEventListener(evt, () => recoverVideo(evt));
 });
 
-// On iOS/Safari, coming back from bfcache can leave video visually frozen
+// On iOS/Safari, coming back from BFCache can leave video visually frozen.
 window.addEventListener("pageshow", () => {
+  // Kick it once; throttling prevents repeats.
+  recoverVideo("pageshow");
   syncPlayback();
 });
 
 // ------------------------------
-// Watchdog: if it stalls while "should be playing", recover it.
+// Watchdog: if it stalls while "should be playing", nudge it.
 // ------------------------------
 let watchdogTimer = null;
 let lastT = 0;
@@ -119,7 +118,6 @@ function startWatchdog() {
 
       if (stuck) {
         stuckCount++;
-
         // Gentle nudge first
         safePlay();
 
@@ -131,7 +129,7 @@ function startWatchdog() {
 
         // Escalate after a few consecutive stuck checks
         if (stuckCount >= 3) {
-          recoverVideo();
+          recoverVideo("watchdog");
           stuckCount = 0;
         }
       } else {
@@ -140,47 +138,12 @@ function startWatchdog() {
     }
 
     lastT = t;
-  }, 800);
+  }, 900);
 }
 
 function stopWatchdog() {
   if (watchdogTimer) clearInterval(watchdogTimer);
   watchdogTimer = null;
-}
-
-// ------------------------------
-// Frame-advance monitor (best signal when supported)
-// ------------------------------
-let lastMediaTime = -1;
-let stuckFrames = 0;
-
-function startFrameMonitor() {
-  if (!("requestVideoFrameCallback" in HTMLVideoElement.prototype)) return;
-
-  const onFrame = (_now, metadata) => {
-    if (document.visibilityState === "visible" && !holdPaused && !linkPaused && !video.paused && !video.ended) {
-      if (metadata.mediaTime === lastMediaTime) {
-        stuckFrames++;
-      } else {
-        stuckFrames = 0;
-        lastMediaTime = metadata.mediaTime;
-      }
-
-      // ~12 frames with no advance -> recover
-      if (stuckFrames > 12) {
-        stuckFrames = 0;
-        recoverVideo();
-      }
-    } else {
-      // reset counters when we shouldn't be playing
-      stuckFrames = 0;
-      lastMediaTime = metadata.mediaTime;
-    }
-
-    video.requestVideoFrameCallback(onFrame);
-  };
-
-  video.requestVideoFrameCallback(onFrame);
 }
 
 // ------------------------------
@@ -253,12 +216,10 @@ function bindHoldToPause() {
 function bindVisibilityHandling() {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
-      // Resume if we aren't intentionally paused
       syncPlayback();
-      // Safari sometimes needs a kick after tab/app switch
-      safePlay();
+      // Light kick on return (throttled)
+      recoverVideo("visibility");
     } else {
-      // Pause in background (saves battery & avoids weird states)
       safePause();
     }
   });
@@ -272,11 +233,10 @@ window.addEventListener("load", () => {
   bindHoldToPause();
   bindVisibilityHandling();
 
-  // Start ASAP once a frame is available; poster covers before then
+  // Start ASAP once a frame is available
   video.addEventListener("loadeddata", () => {
     syncPlayback();
     startWatchdog();
-    startFrameMonitor();
   }, { once: true });
 
   // If autoplay is blocked, first interaction starts it.
