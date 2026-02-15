@@ -32,20 +32,67 @@ function syncPlayback() {
 // Manual loop guard: some browsers (notably iOS Safari) can occasionally stall at loop boundaries.
 function softLoop() {
   if (holdPaused || linkPaused) return;
-  try { video.currentTime = 0; } catch (_) {}
-  safePlay();
+
+  // Pause before seeking; seeking while playing can land on a later keyframe,
+  // which can look like the loop "skips" the first moments.
+  try { video.pause(); } catch (_) {}
+
+  const playFromStart = () => {
+    if (holdPaused || linkPaused) return;
+    safePlay();
+  };
+
+  // Wait for the seek to complete before playing again (more reliable at 0s).
+  try {
+    video.addEventListener("seeked", playFromStart, { once: true });
+    video.currentTime = 0;
+  } catch (_) {
+    playFromStart();
+  }
+
+  // Safety: if "seeked" never fires, attempt play shortly after.
+  setTimeout(() => {
+    if (holdPaused || linkPaused) return;
+    // If we are still at/near the end for any reason, try again.
+    if (isFinite(video.duration) && video.duration > 0 && video.currentTime > video.duration - 0.25) {
+      try { video.currentTime = 0; } catch (_) {}
+    }
+    safePlay();
+  }, 150);
 }
 
 video.addEventListener("ended", softLoop);
 
-// Catch "near end" cases where ended doesn't fire.
+// Avoid forcing the loop early (can cut audio/video cadence and cause visible skips).
+// Only intervene if we're extremely close to the end AND we've stopped advancing.
+let nearEndLastT = 0;
+let nearEndStuckCount = 0;
+
 video.addEventListener("timeupdate", () => {
   if (holdPaused || linkPaused) return;
   if (!isFinite(video.duration) || video.duration <= 0) return;
+  if (video.seeking) return;
 
-  // If we get extremely close to the end, force the loop.
-  if (video.currentTime >= video.duration - 0.05) {
+  const t = video.currentTime;
+  const nearEnd = t >= video.duration - 0.02;
+
+  if (!nearEnd) {
+    nearEndStuckCount = 0;
+    nearEndLastT = t;
+    return;
+  }
+
+  // If timeupdate keeps firing but time isn't changing, we're stuck at the end.
+  if (Math.abs(t - nearEndLastT) < 0.001) {
+    nearEndStuckCount++;
+  } else {
+    nearEndStuckCount = 0;
+  }
+  nearEndLastT = t;
+
+  if (nearEndStuckCount >= 3) {
     softLoop();
+    nearEndStuckCount = 0;
   }
 });
 
